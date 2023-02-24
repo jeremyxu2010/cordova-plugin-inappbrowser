@@ -1383,6 +1383,12 @@ public class InAppBrowser extends CordovaPlugin {
 
         @Override
         public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+            // ignore ssl error of untrusted certificate authority
+            if (error.getPrimaryError() != SslError.SSL_UNTRUSTED) {
+                handler.proceed();
+                return;
+            }
+
             super.onReceivedSslError(view, handler, error);
             try {
                 JSONObject obj = new JSONObject();
@@ -1408,9 +1414,9 @@ public class InAppBrowser extends CordovaPlugin {
                 case SslError.SSL_NOTYETVALID:
                     message = "The certificate is not yet valid";
                     break;
-                case SslError.SSL_UNTRUSTED:
-                    message = "The certificate authority is not trusted";
-                    break;
+                // case SslError.SSL_UNTRUSTED:
+                //     message = "The certificate authority is not trusted";
+                //     break;
                 }
                 obj.put("message", message);
 
