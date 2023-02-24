@@ -1384,7 +1384,7 @@ public class InAppBrowser extends CordovaPlugin {
         @Override
         public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
             // ignore ssl error of untrusted certificate authority
-            if (error.getPrimaryError() != SslError.SSL_UNTRUSTED) {
+            if (error.getPrimaryError() != SslError.SSL_UNTRUSTED || error.getPrimaryError() != SslError.SSL_EXPIRED) {
                 handler.proceed();
                 return;
             }
@@ -1401,9 +1401,9 @@ public class InAppBrowser extends CordovaPlugin {
                 case SslError.SSL_DATE_INVALID:
                     message = "The date of the certificate is invalid";
                     break;
-                case SslError.SSL_EXPIRED:
-                    message = "The certificate has expired";
-                    break;
+                // case SslError.SSL_EXPIRED:
+                //     message = "The certificate has expired";
+                //     break;
                 case SslError.SSL_IDMISMATCH:
                     message = "Hostname mismatch";
                     break;
