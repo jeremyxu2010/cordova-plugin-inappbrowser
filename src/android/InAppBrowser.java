@@ -44,6 +44,8 @@ import android.view.WindowManager;
 import android.view.WindowManager.LayoutParams;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
+import android.view.accessibility.AccessibilityEvent;
+import android.view.accessibility.AccessibilityManager;
 import android.webkit.CookieManager;
 import android.webkit.HttpAuthHandler;
 import android.webkit.JavascriptInterface;
@@ -769,6 +771,7 @@ public class InAppBrowser extends CordovaPlugin {
 
                 _close.setContentDescription("Close Button");
                 _close.setId(Integer.valueOf(id));
+                _close.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
                 _close.setOnClickListener(new View.OnClickListener() {
                     public void onClick(View v) {
                         closeDialog();
@@ -799,6 +802,8 @@ public class InAppBrowser extends CordovaPlugin {
                 // Main container layout
                 LinearLayout main = new LinearLayout(cordova.getActivity());
                 main.setOrientation(LinearLayout.VERTICAL);
+                main.setContentDescription("In-app browser");
+                main.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
 
                 // Toolbar layout
                 RelativeLayout toolbar = new RelativeLayout(cordova.getActivity());
@@ -812,6 +817,8 @@ public class InAppBrowser extends CordovaPlugin {
                     toolbar.setHorizontalGravity(Gravity.RIGHT);
                 }
                 toolbar.setVerticalGravity(Gravity.TOP);
+                toolbar.setContentDescription("Browser toolbar");
+                toolbar.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
 
                 // Action Button Container layout
                 RelativeLayout actionButtonContainer = new RelativeLayout(cordova.getActivity());
@@ -830,6 +837,7 @@ public class InAppBrowser extends CordovaPlugin {
                 back.setLayoutParams(backLayoutParams);
                 back.setContentDescription("Back Button");
                 back.setId(Integer.valueOf(2));
+                back.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
                 Resources activityRes = cordova.getActivity().getResources();
                 int backResId = activityRes.getIdentifier("ic_action_previous_item", "drawable", cordova.getActivity().getPackageName());
                 Drawable backIcon = activityRes.getDrawable(backResId);
@@ -853,6 +861,7 @@ public class InAppBrowser extends CordovaPlugin {
                 forward.setLayoutParams(forwardLayoutParams);
                 forward.setContentDescription("Forward Button");
                 forward.setId(Integer.valueOf(3));
+                forward.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
                 int fwdResId = activityRes.getIdentifier("ic_action_next_item", "drawable", cordova.getActivity().getPackageName());
                 Drawable fwdIcon = activityRes.getDrawable(fwdResId);
                 if (navigationButtonColor != "") forward.setColorFilter(android.graphics.Color.parseColor(navigationButtonColor));
@@ -880,6 +889,8 @@ public class InAppBrowser extends CordovaPlugin {
                 edittext.setInputType(InputType.TYPE_TEXT_VARIATION_URI);
                 edittext.setImeOptions(EditorInfo.IME_ACTION_GO);
                 edittext.setInputType(InputType.TYPE_NULL); // Will not except input... Makes the text NON-EDITABLE
+                edittext.setContentDescription("URL address bar");
+                edittext.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
                 edittext.setOnKeyListener(new View.OnKeyListener() {
                     public boolean onKey(View v, int keyCode, KeyEvent event) {
                         // If the event is a key-down event on the "enter" button
@@ -912,6 +923,8 @@ public class InAppBrowser extends CordovaPlugin {
                 if (closeButtonCaption != "") footer.setPadding(this.dpToPixels(8), this.dpToPixels(8), this.dpToPixels(8), this.dpToPixels(8));
                 footer.setHorizontalGravity(Gravity.LEFT);
                 footer.setVerticalGravity(Gravity.BOTTOM);
+                footer.setContentDescription("Browser footer");
+                footer.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
 
                 View footerClose = createCloseButton(7);
                 footer.addView(footerClose);
@@ -920,6 +933,9 @@ public class InAppBrowser extends CordovaPlugin {
                 inAppWebView = new WebView(cordova.getActivity());
                 inAppWebView.setLayoutParams(new LinearLayout.LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT));
                 inAppWebView.setId(Integer.valueOf(6));
+                
+                // 设置WebView的无障碍支持
+                setupWebViewAccessibility(inAppWebView);
                 // File Chooser Implemented ChromeClient
                 inAppWebView.setWebChromeClient(new InAppChromeClient(thatWebView) {
                     public boolean onShowFileChooser (WebView webView, ValueCallback<Uri[]> filePathCallback, WebChromeClient.FileChooserParams fileChooserParams)
@@ -948,6 +964,15 @@ public class InAppBrowser extends CordovaPlugin {
                 settings.setJavaScriptCanOpenWindowsAutomatically(true);
                 settings.setBuiltInZoomControls(showZoomControls);
                 settings.setPluginState(android.webkit.WebSettings.PluginState.ON);
+                
+                // 启用无障碍支持
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                    settings.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
+                }
+                
+                // 确保WebView能够正确处理无障碍事件
+                settings.setDomStorageEnabled(true);
+                settings.setDatabaseEnabled(true);
                 
                 // download event
                 
@@ -1046,6 +1071,8 @@ public class InAppBrowser extends CordovaPlugin {
 
                 // Add our webview to our main view/layout
                 RelativeLayout webViewLayout = new RelativeLayout(cordova.getActivity());
+                webViewLayout.setContentDescription("Web content area");
+                webViewLayout.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
                 webViewLayout.addView(inAppWebView);
                 main.addView(webViewLayout);
 
@@ -1382,6 +1409,9 @@ public class InAppBrowser extends CordovaPlugin {
             view.clearFocus();
             view.requestFocus();
 
+            // 注入无障碍支持的JavaScript代码
+            injectAccessibilitySupport(view);
+
             try {
                 JSONObject obj = new JSONObject();
                 obj.put("type", LOAD_STOP_EVENT);
@@ -1491,6 +1521,151 @@ public class InAppBrowser extends CordovaPlugin {
 
             // By default handle 401 like we'd normally do!
             super.onReceivedHttpAuthRequest(view, handler, host, realm);
+        }
+
+        /**
+         * 注入无障碍支持的JavaScript代码到WebView
+         * 这些代码将帮助WebView内容更好地与无障碍服务交互
+         *
+         * @param webView 要注入代码的WebView
+         */
+        private void injectAccessibilitySupport(WebView webView) {
+            String accessibilityScript = 
+                "(function() {" +
+                "    // 检查无障碍服务是否启用" +
+                "    if (window.accessibility && window.accessibility.isAccessibilityEnabled()) {" +
+                "        // 为所有可交互元素添加无障碍支持" +
+                "        function enhanceAccessibility() {" +
+                "            var elements = document.querySelectorAll('button, input, select, textarea, a, [role=\"button\"], [role=\"link\"], [role=\"textbox\"], [role=\"checkbox\"], [role=\"radio\"], [role=\"menuitem\"]');" +
+                "            elements.forEach(function(element) {" +
+                "                if (!element.hasAttribute('aria-label') && !element.hasAttribute('aria-labelledby')) {" +
+                "                    var label = element.getAttribute('title') || element.getAttribute('alt') || element.textContent || element.value;" +
+                "                    if (label && label.trim()) {" +
+                "                        element.setAttribute('aria-label', label.trim());" +
+                "                    }" +
+                "                }" +
+                "                " +
+                "                // 确保元素可以被无障碍服务识别" +
+                "                if (!element.hasAttribute('tabindex') && element.tagName !== 'A' && element.tagName !== 'BUTTON' && element.tagName !== 'INPUT' && element.tagName !== 'SELECT' && element.tagName !== 'TEXTAREA') {" +
+                "                    element.setAttribute('tabindex', '0');" +
+                "                }" +
+                "            });" +
+                "        }" +
+                "        " +
+                "        // 页面加载完成后立即执行" +
+                "        enhanceAccessibility();" +
+                "        " +
+                "        // 监听DOM变化，动态添加无障碍支持" +
+                "        var observer = new MutationObserver(function(mutations) {" +
+                "            mutations.forEach(function(mutation) {" +
+                "                if (mutation.type === 'childList') {" +
+                "                    mutation.addedNodes.forEach(function(node) {" +
+                "                        if (node.nodeType === 1) { // Element node" +
+                "                            enhanceAccessibility();" +
+                "                        }" +
+                "                    });" +
+                "                }" +
+                "            });" +
+                "        });" +
+                "        " +
+                "        observer.observe(document.body, {" +
+                "            childList: true," +
+                "            subtree: true" +
+                "        });" +
+                "        " +
+                "        // 为动态内容变化添加无障碍支持" +
+                "        var originalAppendChild = Node.prototype.appendChild;" +
+                "        Node.prototype.appendChild = function(child) {" +
+                "            var result = originalAppendChild.call(this, child);" +
+                "            if (child.nodeType === 1) {" +
+                "                setTimeout(enhanceAccessibility, 100);" +
+                "            }" +
+                "            return result;" +
+                "        };" +
+                "        " +
+                "        // 监听焦点变化，提供无障碍反馈" +
+                "        document.addEventListener('focusin', function(event) {" +
+                "            var element = event.target;" +
+                "            if (element && element.getAttribute('aria-label')) {" +
+                "                window.accessibility.announceForAccessibility('Focused: ' + element.getAttribute('aria-label'));" +
+                "            }" +
+                "        }, true);" +
+                "    }" +
+                "})();";
+            
+            webView.evaluateJavascript(accessibilityScript, null);
+        }
+    }
+
+    /**
+     * 设置WebView的无障碍支持
+     * 确保WebView内容能够被TalkBack等屏幕阅读器正确识别
+     *
+     * @param webView 要设置无障碍支持的WebView
+     */
+    private void setupWebViewAccessibility(WebView webView) {
+        // 确保WebView对无障碍服务可见
+        webView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+        
+        // 设置无障碍内容描述
+        webView.setContentDescription("Web content");
+        
+        // 确保WebView可以获得焦点
+        webView.setFocusable(true);
+        webView.setFocusableInTouchMode(true);
+        
+        // 对于Android 4.1及以上版本，启用WebView的无障碍支持
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            webView.setAccessibilityDelegate(new View.AccessibilityDelegate() {
+                @Override
+                public void onInitializeAccessibilityEvent(View host, AccessibilityEvent event) {
+                    super.onInitializeAccessibilityEvent(host, event);
+                    // 确保WebView内容变化时能够触发无障碍事件
+                    event.setClassName(WebView.class.getName());
+                }
+                
+                @Override
+                public void onInitializeAccessibilityNodeInfo(View host, android.view.accessibility.AccessibilityNodeInfo info) {
+                    super.onInitializeAccessibilityNodeInfo(host, info);
+                    // 设置WebView的节点信息
+                    info.setClassName(WebView.class.getName());
+                    info.setScrollable(true);
+                    info.setClickable(true);
+                    info.setFocusable(true);
+                }
+            });
+        }
+        
+        // 设置WebView的JavaScript接口，用于无障碍支持
+        webView.addJavascriptInterface(new AccessibilityInterface(), "accessibility");
+    }
+
+    /**
+     * JavaScript接口，用于WebView内容与无障碍服务的交互
+     */
+    private class AccessibilityInterface {
+        @JavascriptInterface
+        public void announceForAccessibility(String text) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                AccessibilityManager accessibilityManager = (AccessibilityManager) 
+                    cordova.getActivity().getSystemService(Context.ACCESSIBILITY_SERVICE);
+                if (accessibilityManager.isEnabled()) {
+                    AccessibilityEvent event = AccessibilityEvent.obtain();
+                    event.setEventType(AccessibilityEvent.TYPE_ANNOUNCEMENT);
+                    event.getText().add(text);
+                    accessibilityManager.sendAccessibilityEvent(event);
+                }
+            }
+        }
+        
+        @JavascriptInterface
+        public boolean isAccessibilityEnabled() {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+                AccessibilityManager accessibilityManager = (AccessibilityManager) 
+                    cordova.getActivity().getSystemService(Context.ACCESSIBILITY_SERVICE);
+                return accessibilityManager.isEnabled();
+            }
+            return false;
         }
     }
 }
