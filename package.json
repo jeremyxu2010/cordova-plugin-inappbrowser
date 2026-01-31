@@ -26,7 +26,8 @@
   ],
   "scripts": {
     "test": "npm run lint",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "build:android": "./scripts/verify-build.sh"
   },
   "engines": {
     "cordovaDependencies": {
@@ -55,6 +56,7 @@
   "author": "Apache Software Foundation",
   "license": "Apache-2.0",
   "devDependencies": {
-    "@cordova/eslint-config": "^5.0.0"
+    "@cordova/eslint-config": "^5.0.0",
+    "cordova": "^13.0.0"
   }
 }
