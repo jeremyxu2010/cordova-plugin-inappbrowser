@@ -1,222 +1,207 @@
 # AGENTS.md - Cordova InAppBrowser Plugin
 
-This document provides essential information for agentic coding agents working on the Apache Cordova InAppBrowser plugin repository.
+Essential information for agentic coding agents working on this Apache Cordova plugin.
 
 ## Project Overview
 
-**Type**: Apache Cordova Plugin for in-app browser functionality  
-**Platforms**: Android, iOS, Browser  
-**Language**: JavaScript (with platform-specific Java/Objective-C implementations)  
-**License**: Apache 2.0  
-**Repository**: https://github.com/apache/cordova-plugin-inappbrowser
+- **Type**: Apache Cordova Plugin for in-app browser functionality
+- **Platforms**: Android, iOS, Browser
+- **Languages**: JavaScript, Java (Android), Objective-C (iOS)
+- **License**: Apache 2.0 (all new files MUST include license header)
 
-## Build & Development Commands
+## Build & Test Commands
 
-### Package Management
 ```bash
-npm install          # Install dependencies
-npm ci               # Clean install (CI)
+npm install              # Install dependencies
+npm run lint             # Run ESLint on all JS files
+npm test                 # Alias for npm run lint
+npm run build:android    # Run Android verification script
 ```
 
-### Linting & Code Quality
-```bash
-npm run lint         # Run ESLint on all files
-npm test             # Alias for `npm run lint`
-```
+### Running Specific Tests
 
-### Platform-Specific Testing
-The project uses GitHub Actions for platform-specific testing:
-- `android.yml` - Android testsuite
-- `ios.yml` - iOS testsuite  
-- `chrome.yml` - Browser testsuite
-- `lint.yml` - Lint validation
+Tests run via GitHub Actions CI. Manual testing requires a Cordova project:
+- **Auto tests**: `tests/tests.js` → `exports.defineAutoTests()` (Jasmine)
+- **Manual tests**: `tests/tests.js` → `exports.defineManualTests()`
 
-### Running Tests
+To run lint on a specific file:
 ```bash
-# Manual test execution depends on Cordova test framework
-# See tests/tests.js for test definitions
+npx eslint www/inappbrowser.js
+npx eslint tests/tests.js
 ```
 
 ## Code Style Guidelines
 
 ### ESLint Configuration
-- **Config File**: `.eslintrc.yml`
-- **Base Config**: `@cordova/eslint-config/browser`
-- **Test Override**: `@cordova/eslint-config/node-tests` for test files
+- **Root**: `.eslintrc.yml` → extends `@cordova/eslint-config/browser`
+- **Tests**: Configured via overrides in root `.eslintrc.yml` → extends `@cordova/eslint-config/node-tests`
+- **Test env**: `tests/.eslintrc.yml` → adds `jasmine: true` environment
 
-### JavaScript Patterns
+### JavaScript Module Pattern (IIFE + CommonJS)
 
-#### Module Structure
-- **Immediate Invoked Function Expression (IIFE)** pattern for main module
-- **CommonJS** `require()` for dependencies
-- **Module exports** using `module.exports`
+All JavaScript files follow this pattern:
 
-Example from `www/inappbrowser.js`:
 ```javascript
+/* Apache License Header (20 lines including closing comment) */
+
 (function () {
     const exec = require('cordova/exec');
     const channel = require('cordova/channel');
     
-    function InAppBrowser() {
-        // Constructor
+    function ConstructorName () {
+        this.channels = {
+            eventname: channel.create('eventname')
+        };
     }
     
-    InAppBrowser.prototype = {
-        // Methods
+    ConstructorName.prototype = {
+        method: function (param) {
+            // implementation
+        },
+        addEventListener: function (eventname, f) {
+            if (eventname in this.channels) {
+                this.channels[eventname].subscribe(f);
+            }
+        }
     };
     
-    module.exports = function (strUrl, strWindowName, strWindowFeatures, callbacks) {
-        // Factory function
+    module.exports = function (/* args */) {
+        return new ConstructorName();
     };
 })();
 ```
 
-#### Naming Conventions
-- **Constructor Functions**: PascalCase (`InAppBrowser`)
-- **Methods**: camelCase (`addEventListener`, `executeScript`)
-- **Variables**: camelCase (`strUrl`, `iabInstance`)
-- **Constants**: camelCase (no ALL_CAPS convention observed)
+### Naming Conventions
 
-#### Error Handling
-- Use `throw new Error()` with descriptive messages
-- Check parameters before execution
-- Example: `executeScript` validates `injectDetails` parameter
+| Element | Convention | Example |
+|---------|------------|---------|
+| Constructors | PascalCase | `InAppBrowser` |
+| Methods/Functions | camelCase | `addEventListener`, `executeScript` |
+| Variables | camelCase | `strUrl`, `iabInstance` |
+| Private methods | underscore prefix | `_eventHandler`, `_loadAfterBeforeload` |
+| File names | lowercase | `inappbrowser.js` |
 
-#### Function Patterns
-- Prototype-based inheritance for object methods
-- Factory function pattern for creating instances
-- Event-driven architecture using Cordova channels
+### Error Handling Pattern
 
-### TypeScript Definitions
-- **Location**: `types/index.d.ts`
-- **Version**: TypeScript 2.3+
-- **Purpose**: Type definitions for plugin API
-- **Key Interfaces**: `InAppBrowser`, `InAppBrowserEvent`, `Cordova`
+```javascript
+// Always validate and throw descriptive errors
+executeScript: function (injectDetails, cb) {
+    if (injectDetails.code) {
+        exec(cb, null, 'InAppBrowser', 'injectScriptCode', [injectDetails.code, !!cb]);
+    } else if (injectDetails.file) {
+        exec(cb, null, 'InAppBrowser', 'injectScriptFile', [injectDetails.file, !!cb]);
+    } else {
+        throw new Error('executeScript requires exactly one of code or file to be specified');
+    }
+}
+```
 
-### Platform-Specific Code
-- **Android**: Java files in `src/android/`
-- **iOS**: Objective-C files in `src/ios/`
-- **Browser**: JavaScript proxy in `src/browser/`
+### Cordova Exec Pattern
+
+```javascript
+// Native bridge calls
+exec(successCallback, errorCallback, 'ServiceName', 'actionName', [args]);
+exec(cb, null, 'InAppBrowser', 'close', []);  // null for unused callback
+```
 
 ## File Structure
 
 ```
-.
-├── www/
-│   └── inappbrowser.js          # Main JavaScript API
-├── src/
-│   ├── android/                 # Android implementation
-│   ├── ios/                     # iOS implementation  
-│   └── browser/                 # Browser implementation
-├── types/
-│   └── index.d.ts              # TypeScript definitions
-├── tests/
-│   ├── tests.js                # Test suite
-│   ├── package.json           # Test package config
-│   └── .eslintrc.yml          # Test ESLint config
-├── plugin.xml                  # Cordova plugin manifest
-├── package.json               # NPM package config
-├── .eslintrc.yml              # ESLint configuration
-└── .github/workflows/         # CI/CD pipelines
+├── www/inappbrowser.js          # Main JS API (IIFE pattern)
+├── src/android/*.java           # Android native (3 files)
+├── src/ios/*.m                  # iOS native (4 .m + 4 .h files)
+├── src/browser/*.js             # Browser proxy
+├── types/index.d.ts             # TypeScript definitions
+├── tests/tests.js               # Jasmine test suite
+├── plugin.xml                   # Cordova plugin manifest
+└── package.json                 # npm config
 ```
 
 ## Key Implementation Patterns
 
-### 1. Event System
-- Uses Cordova's `channel` module for event management
-- Events: `loadstart`, `loadstop`, `loaderror`, `exit`, `message`, `download`
-- Event handlers attached via `addEventListener`
+### Event System (Cordova Channels)
 
-### 2. Platform Bridge
-- Uses `cordova/exec` for native communication
-- Method signatures follow Cordova plugin pattern
-- Platform-specific implementations handle native browser functionality
+```javascript
+// Creating channels
+this.channels = {
+    loadstart: channel.create('loadstart'),
+    loadstop: channel.create('loadstop'),
+    exit: channel.create('exit')
+};
 
-### 3. Configuration
-- `plugin.xml` defines platform configurations, resources, and dependencies
-- Preference settings for platform-specific behavior
-- Resource files for platform UI elements
+// Firing events
+this.channels[event.type].fire(event);
+
+// Subscribing/Unsubscribing
+this.channels[eventname].subscribe(callback);
+this.channels[eventname].unsubscribe(callback);
+```
+
+### TypeScript Definitions
+
+Update `types/index.d.ts` when changing the API:
+
+```typescript
+interface InAppBrowser {
+    open(url: string, target?: string, options?: string): InAppBrowser;
+    addEventListener(type: channel, callback: InAppBrowserEventListenerOrEventListenerObject): void;
+    close(): void;
+    show(): void;
+    hide(): void;
+    executeScript(script: { code: string } | { file: string }, callback: (result: any) => void): void;
+    insertCSS(css: { code: string } | { file: string }, callback: () => void): void;
+}
+```
 
 ## Development Workflow
 
-### 1. Making Changes
-1. Ensure ESLint passes: `npm run lint`
-2. Follow existing patterns in similar files
-3. Update TypeScript definitions if API changes
-4. Add/update tests in `tests/tests.js`
+### Adding a New Feature
 
-### 2. Testing
-- Platform tests run via GitHub Actions
-- Manual testing requires Cordova project setup
-- Test coverage includes API methods and event handling
+1. Add JS API in `www/inappbrowser.js` (follow prototype pattern)
+2. Add native implementation in `src/android/` and/or `src/ios/`
+3. Update `types/index.d.ts` with new types
+4. Add tests in `tests/tests.js`
+5. Update `README.md` for user-facing changes
+6. Run `npm run lint` before committing
 
-### 3. Code Review Considerations
-- **API Compatibility**: Changes must maintain backward compatibility
-- **Cross-Platform Consistency**: Behavior should be consistent across platforms
-- **Error Handling**: Proper error messages and handling
-- **Documentation**: Update README.md for user-facing changes
+### Test Patterns (Jasmine)
 
-## Plugin Configuration
-
-### Preferences (config.xml)
-```xml
-<preference name="InAppBrowserStatusBarStyle" value="lightcontent" />
+```javascript
+describe('cordova.InAppBrowser', function () {
+    let iabInstance;
+    
+    beforeEach(function () {
+        jasmine.DEFAULT_TIMEOUT_INTERVAL = 30000;
+    });
+    
+    afterEach(function (done) {
+        if (iabInstance !== null && iabInstance.close) {
+            iabInstance.close();
+        }
+        setTimeout(done, 2000);
+    });
+    
+    it('should exist', function () {
+        expect(cordova.InAppBrowser).toBeDefined();
+    });
+});
 ```
 
-### Platform-Specific Options
-See `README.md` for complete list of `open()` method options for each platform.
+## Platform Quirks
 
-## Common Tasks
+- **Browser**: `loadstart`, `loaderror`, `message` events not fired
+- **iOS**: Uses WKWebView; supports `beforeload` interception
+- **Android**: Supports `download` event; hardware back button handling
 
-### Adding New Feature
-1. Add JavaScript API in `www/inappbrowser.js`
-2. Implement platform-specific code in `src/` directories
-3. Update TypeScript definitions in `types/index.d.ts`
-4. Add tests in `tests/tests.js`
-5. Update documentation in `README.md`
+## Quality Checklist
 
-### Fixing Bug
-1. Reproduce issue across platforms
-2. Identify root cause in platform-specific code
-3. Fix with minimal changes
-4. Add regression test if applicable
-5. Verify fix on all platforms
-
-### Performance Optimization
-1. Profile platform-specific implementations
-2. Optimize native code (Java/Objective-C)
-3. Reduce JavaScript overhead
-4. Test on target devices
-
-## Quality Standards
-
-### Code Quality
-- ESLint must pass with no errors
-- Follow Apache Cordova coding conventions
-- Consistent error handling patterns
-- Clear, descriptive variable and function names
-
-### Documentation
-- Public API documented in README.md
-- TypeScript definitions complete and accurate
-- Code comments for complex logic
-- JSDoc for public methods (where applicable)
-
-### Testing
-- Platform tests pass in CI
-- Edge cases covered
-- Cross-platform behavior verified
-
-## Notes for Agentic Coding
-
-1. **Context Awareness**: This is an Apache Foundation project with strict licensing requirements
-2. **Cross-Platform**: Changes must consider Android, iOS, and Browser implementations
-3. **Backward Compatibility**: API changes should maintain existing behavior
-4. **Event System**: Understand Cordova's channel-based event architecture
-5. **Native Bridge**: Familiarity with `cordova/exec` pattern required for platform work
+- [ ] All new JS files have Apache license header (20 lines including closing comment)
+- [ ] ESLint passes: `npm run lint`
+- [ ] TypeScript definitions updated if API changed
+- [ ] Backward compatibility maintained
+- [ ] Cross-platform behavior verified (or platform-specific handling documented)
 
 ## References
-- [Apache Cordova Documentation](https://cordova.apache.org/docs/)
-- [Cordova Plugin Development Guide](https://cordova.apache.org/docs/en/latest/guide/hybrid/plugins/)
-- [ESLint Configuration](https://eslint.org/docs/user-guide/configuring/)
-- [TypeScript Definition Files](https://www.typescriptlang.org/docs/handbook/declaration-files/introduction.html)
+
+- [Cordova Plugin Development](https://cordova.apache.org/docs/en/latest/guide/hybrid/plugins/)
+- [Apache License Header](http://www.apache.org/licenses/LICENSE-2.0)
