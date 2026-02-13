@@ -108,8 +108,15 @@ exec(cb, null, 'InAppBrowser', 'close', []);  // null for unused callback
 
 ```
 ├── www/inappbrowser.js          # Main JS API (IIFE pattern)
-├── src/android/*.java           # Android native (3 files)
-├── src/ios/*.m                  # iOS native (4 .m + 4 .h files)
+├── src/android/                 # Android native (3 Java files)
+│   ├── InAppBrowser.java
+│   ├── InAppBrowserDialog.java
+│   └── InAppChromeClient.java
+├── src/ios/                     # iOS native (4 .m + 4 .h files)
+│   ├── CDVWKInAppBrowser.{h,m}
+│   ├── CDVInAppBrowserOptions.{h,m}
+│   ├── CDVInAppBrowserNavigationController.{h,m}
+│   └── CDVWKInAppBrowserUIDelegate.{h,m}
 ├── src/browser/*.js             # Browser proxy
 ├── types/index.d.ts             # TypeScript definitions
 ├── tests/tests.js               # Jasmine test suite
@@ -193,6 +200,23 @@ describe('cordova.InAppBrowser', function () {
 - **iOS**: Uses WKWebView; supports `beforeload` interception
 - **Android**: Supports `download` event; hardware back button handling
 
+## Commit Conventions
+
+This project uses conventional commit messages:
+
+```
+feat(android): Add download event support
+fix(ios): Remove deprecation warnings
+chore: Update dependencies
+docs: Improve AGENTS.md
+ci: Sync workflow with paramedic
+```
+
+**Format**: `<type>(<scope>): <description>`
+
+**Types**: `feat`, `fix`, `chore`, `docs`, `ci`, `test`, `refactor`  
+**Scopes**: `android`, `ios`, `browser` (or omit for general changes)
+
 ## Quality Checklist
 
 - [ ] All new JS files have Apache license header (20 lines including closing comment)
@@ -200,8 +224,10 @@ describe('cordova.InAppBrowser', function () {
 - [ ] TypeScript definitions updated if API changed
 - [ ] Backward compatibility maintained
 - [ ] Cross-platform behavior verified (or platform-specific handling documented)
+- [ ] Commit message follows conventional commit format
 
 ## References
 
 - [Cordova Plugin Development](https://cordova.apache.org/docs/en/latest/guide/hybrid/plugins/)
 - [Apache License Header](http://www.apache.org/licenses/LICENSE-2.0)
+- [Contributing Guide](./CONTRIBUTING.md)
